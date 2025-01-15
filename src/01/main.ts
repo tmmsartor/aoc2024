@@ -31,7 +31,7 @@ async function parse(filePath: string): Promise<ParsedNumbers> {
 			return { firstNumbers, secondNumbers };
 		} catch (error) {
 			if (error instanceof Error) {
-				throw new Error(`Failed to parse file: ${error.message}`);
+				//throw new Error(`Failed to parse file: ${error.message}`);
 			}
 			throw error;
 		}
@@ -49,6 +49,8 @@ async function solve1(input: ParsedNumbers): Promise<number> {
 }
 
 async function solve2(input: ParsedNumbers): Promise<number> {
+	// compute nr.occurences of each number from first list  in second list and multiply with its value value
+	// sum all the results
 	const {firstNumbers, secondNumbers } = input;
 	let score:number = 0;
 	const occurrences = new Map<number, number>();
@@ -64,7 +66,6 @@ async function solve2(input: ParsedNumbers): Promise<number> {
 	return score;
 }
 
-// Example usage
 async function main() {
 	try {
 		const input : ParsedNumbers = await parse('input');
@@ -72,9 +73,8 @@ async function main() {
 		console.log(await solve1(input));
 		console.log(await solve2(input));
 
-
 	} catch (error) {
-			console.error('Error:', error.message);
+			//console.error('Error:', error.message);
 			process.exit(1);
 	}
 }
