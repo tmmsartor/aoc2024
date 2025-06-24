@@ -87,9 +87,10 @@ bool check_solutions(const fs::path& sol_path, const Solution& sol){
       return true;
     }
     if (sol.first != true_sol.first || sol.second != true_sol.second) cout << "--- Error" << endl;
-    if (sol.first != true_sol.first) cout << true_sol.first << "!=" << sol.first  << endl;
-    if (sol.second != true_sol.second) cout << true_sol.second << "!=" << sol.second << endl;
+    if (sol.first != true_sol.first)   cout << "Part1: " << true_sol.first  << "!=" << sol.first  << endl;
+    if (sol.second != true_sol.second) cout << "Part2: " << true_sol.second << "!=" << sol.second << endl;
   } else {
+    cout << "-- True solution not available" << endl;
     cout << "Part1: " << sol.first << endl;
     cout << "Part2: " << sol.second << endl;
   }

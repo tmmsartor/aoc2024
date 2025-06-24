@@ -12,10 +12,6 @@ function(add_day day_nr)
   target_compile_definitions(main PRIVATE DAY${nn}=1)
 endfunction()
 
-
-add_day(0)
-add_day(1)
-
-foreach(i RANGE 7 25)
+foreach(i RANGE 0 25)
   add_day(${i})
 endforeach()

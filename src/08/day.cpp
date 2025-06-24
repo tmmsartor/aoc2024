@@ -1,8 +1,6 @@
 #include "day.hpp"
 
 
-//template<>
-//int DayAPI<day08::Day>::day = 8;
 
 namespace day08{
 

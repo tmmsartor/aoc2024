@@ -41,9 +41,7 @@ int main(int argc, char* argv[]) {
     return 1;
   }
   string day_s;
-  bool all_solved = true;
-
-  if constexpr (!is_empty_v<day01::Day>) cout << "day01 not empty" << endl;
+  set<int> errors = {};
 
   for(auto& solver : solvers) {
 
@@ -73,12 +71,17 @@ int main(int argc, char* argv[]) {
       file.close();
 
       cout << case_msg << " ";
-      if (!aoc::check_solutions(sol_path, sol)) all_solved = false;
-
+      if (!aoc::check_solutions(sol_path, sol))
+          errors.insert(solver->day());
     }
 
     cout << endl;
   }
 
-  if (all_solved) cout << endl << "--- All Solved" << endl;
+  if (!errors.size()) cout << endl << "--- All Solved" << endl;
+  else {
+      cout << "--- Failing cases: ";
+      for (auto failing_day: errors) cout << failing_day << " ";
+      cout << endl;
+  }
 }

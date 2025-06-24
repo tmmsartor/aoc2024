@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Interactive Directed Graph</title>
+		<!-- Tailwind CSS CDN -->
+		<script src="https://cdn.tailwindcss.com"></script>
+		<!-- D3.js CDN -->
+		<script src="https://d3js.org/d3.v7.min.js"></script>
+		<style>
+				/* Custom CSS for D3 elements */
+				html, body {
+						height: 100%; /* Ensure html and body take full height */
+						margin: 0;
+						overflow: hidden; /* Prevent scrolling if content exceeds viewport */
+				}
+				body {
+						font-family: 'Inter', sans-serif;
+						background-color: #f0f4f8; /* Light gray background */
+				}
+
+				.link {
+						stroke: #999;
+						stroke-opacity: 0.6;
+						stroke-width: 2px;
+				}
+
+				.node circle {
+						stroke: #fff;
+						stroke-width: 1.5px;
+						cursor: pointer;
+						transition: fill 0.2s ease-in-out, r 0.2s ease-in-out; /* Smooth transitions */
+				}
+
+				.node text {
+						font-size: 10px;
+						text-anchor: middle;
+						dominant-baseline: central;
+						pointer-events: none; /* Make text not interfere with mouse events on circle */
+						user-select: none;
+				}
+
+				.node-highlighted circle {
+						fill: #ef4444 !important; /* Tailwind red-500 */
+						r: 10px !important;
+				}
+
+				.link-active {
+						stroke: #3b82f6 !important; /* Tailwind blue-500 */
+						stroke-opacity: 1 !important;
+						stroke-width: 3px !important;
+				}
+
+				.dimmed {
+						opacity: 0.2;
+						transition: opacity 0.3s ease-in-out;
+				}
+
+				/* Define arrowhead style */
+				marker#arrow {
+						fill: #999;
+				}
+
+				marker#arrow.active {
+						fill: #3b82f6; /* Blue for active links */
+				}
+		</style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+
+		<div class="bg-white p-8 rounded-lg shadow-xl w-full h-full flex flex-col items-center">
+				<h1 class="text-3xl font-bold mb-6 text-gray-800">Interactive Directed Graph</h1>
+				<div id="graph-container" class="w-full h-full flex justify-center items-center">
+						<!-- D3.js graph will be rendered here -->
+				</div>
+				<p class="mt-4 text-gray-600 text-center">Hover over a node to highlight it and its direct children!</p>
+		</div>
+
+		<script>
+				document.addEventListener('DOMContentLoaded', function() {
+						// Define graph dimensions based on window size
+						let width = window.innerWidth * 0.9; // Use 90% of window width
+						let height = window.innerHeight * 0.7; // Use 70% of window height
+
+						// Adjust for padding and header/footer
+						const containerPadding = 32; // Corresponds to p-8 in Tailwind (8 * 4 = 32px)
+						const headerHeight = document.querySelector('h1').offsetHeight;
+						const paragraphHeight = document.querySelector('p').offsetHeight;
+						const verticalMargin = 24; // Approx mt-6 and mb-6 for h1, and mt-4 for p
+
+						height = window.innerHeight - headerHeight - paragraphHeight - (containerPadding * 2) - verticalMargin;
+						// Ensure a minimum height if calculated height becomes too small
+						if (height < 300) height = 300;
+
+						// Function to initialize and render the graph
+						function renderGraph(graph) {
+								// Select the container for the SVG
+								const svg = d3.select("#graph-container")
+										.append("svg")
+										.attr("viewBox", `0 0 ${width} ${height}`)
+										.attr("class", "rounded-lg border border-gray-200")
+										.style("width", "100%")
+										.style("height", "100%"); // Ensure responsiveness
+
+								// Define arrow markers for directed links
+								svg.append("defs").append("marker")
+										.attr("id", "arrow")
+										.attr("viewBox", "0 -5 10 10")
+										.attr("refX", 18) // Position the arrowhead relative to the end of the line
+										.attr("refY", 0)
+										.attr("markerWidth", 6)
+										.attr("markerHeight", 6)
+										.attr("orient", "auto")
+										.append("path")
+										.attr("d", "M0,-5L10,0L0,5")
+										.attr("class", "arrowhead"); // Use a class for styling
+
+								// Create a force simulation
+								const simulation = d3.forceSimulation(graph.nodes)
+										.force("link", d3.forceLink(graph.links).id(d => d.id).distance(500))
+										.force("charge", d3.forceManyBody().strength(-300)) // Push nodes apart
+										.force("center", d3.forceCenter(width / 2, height / 2)); // Center the graph dynamically
+
+								// Draw links
+								const link = svg.append("g")
+										.attr("class", "links")
+										.selectAll("line")
+										.data(graph.links)
+										.enter().append("line")
+										.attr("class", "link")
+										.attr("marker-end", "url(#arrow)"); // Attach arrowhead to the end of the link
+
+								// Draw nodes
+								const node = svg.append("g")
+										.attr("class", "nodes")
+										.selectAll("g")
+										.data(graph.nodes)
+										.enter().append("g")
+										.attr("class", "node");
+
+								node.append("circle")
+										.attr("r", 8)
+										.attr("fill", "#60a5fa"); // Tailwind blue-400
+
+								node.append("text")
+										.attr("dy", ".35em")
+										.text(d => d.name);
+
+								// Set up drag behavior for nodes
+								node.call(d3.drag()
+										.on("start", dragstarted)
+										.on("drag", dragged)
+										.on("end", dragended));
+
+								// Define the zoom behavior
+								const zoom = d3.zoom()
+										.scaleExtent([0.5, 8]) // Limits how much you can zoom in and out
+										.on("zoom", zoomed); // Call the 'zoomed' function on zoom events
+
+								// Apply the zoom behavior to the SVG element
+								svg.call(zoom);
+
+								function zoomed(event) {
+										// Apply the transformation (scale and translate) to the graphGroup
+										graphGroup.attr("transform", event.transform);
+								}
+
+								// Store children for quick lookup
+								const linkedById = {};
+								graph.links.forEach(d => {
+										linkedById[d.source.id + "," + d.target.id] = true;
+								});
+
+								// Function to find direct children of a node
+								function getChildren(nodeId) {
+										const children = new Set();
+										graph.links.forEach(link => {
+												// Check if the source of the link is the nodeId and the target is not the same as source
+												if (link.source.id === nodeId && link.target.id !== nodeId) {
+														children.add(link.target.id);
+												}
+										});
+										return Array.from(children);
+								}
+
+								// Mouseover event handler
+								node.on("mouseover", function(event, d) {
+										const hoveredNodeId = d.id;
+										const childrenIds = getChildren(hoveredNodeId);
+										const relevantNodeIds = new Set([hoveredNodeId, ...childrenIds]);
+
+										// Highlight hovered node and its children
+										node.classed("node-highlighted", function(n) {
+												return relevantNodeIds.has(n.id);
+										});
+
+										// Highlight links connected to children or originating from the hovered node
+										link.classed("link-active", function(l) {
+												return (l.source.id === hoveredNodeId && childrenIds.includes(l.target.id));
+										});
+
+										// Highlight arrowheads for active links
+										svg.selectAll("#arrow").classed("active", function(a, i, nodes) {
+												const linkData = link.data()[i]; // Get the data for the current link
+												return (linkData.source.id === hoveredNodeId && childrenIds.includes(linkData.target.id));
+										});
+
+										// Dim non-relevant nodes and links
+										node.classed("dimmed", function(n) {
+												return !relevantNodeIds.has(n.id);
+										});
+										link.classed("dimmed", function(l) {
+												return !(l.source.id === hoveredNodeId && childrenIds.includes(l.target.id));
+										});
+										svg.selectAll(".arrowhead").classed("dimmed", function(a, i, nodes) {
+												const linkData = link.data()[i];
+												return !(linkData.source.id === hoveredNodeId && childrenIds.includes(linkData.target.id));
+										});
+								});
+
+								// Mouseout event handler
+								node.on("mouseout", function() {
+										// Reset all highlighting and dimming
+										node.classed("node-highlighted", false);
+										link.classed("link-active", false);
+										node.classed("dimmed", false);
+										link.classed("dimmed", false);
+										svg.selectAll("#arrow").classed("active", false);
+										svg.selectAll(".arrowhead").classed("dimmed", false);
+								});
+
+								// Update positions of nodes and links on each tick of the simulation
+								simulation.on("tick", () => {
+										link
+												.attr("x1", d => d.source.x)
+												.attr("y1", d => d.source.y)
+												.attr("x2", d => d.target.x)
+												.attr("y2", d => d.target.y);
+
+										node
+												.attr("transform", d => `translate(${d.x},${d.y})`);
+								});
+
+								// Drag functions
+								function dragstarted(event, d) {
+										if (!event.active) simulation.alphaTarget(0.3).restart();
+										d.fx = d.x;
+										d.fy = d.y;
+								}
+
+								function dragged(event, d) {
+										d.fx = event.x;
+										d.fy = event.y;
+								}
+
+								function dragended(event, d) {
+										if (!event.active) simulation.alphaTarget(0);
+										d.fx = null; // Release fixed position
+										d.fy = null; // Release fixed position
+								}
+						}
+
+						// Fetch graph data from JSON file
+						fetch('output.json')
+								.then(response => {
+										if (!response.ok) {
+												throw new Error(`HTTP error! status: ${response.status}`);
+										}
+										return response.json();
+								})
+								.then(graphData => {
+										renderGraph(graphData);
+								})
+								.catch(error => {
+										console.error('Error fetching graph data:', error);
+										// You might want to display a user-friendly error message here
+										d3.select("#graph-container").append("p")
+												.attr("class", "text-red-500 text-center text-lg")
+												.text("Failed to load graph data. Please ensure 'graph_data.json' exists and is valid.");
+								});
+
+
+						// Handle window resizing
+						window.addEventListener('resize', () => {
+								width = window.innerWidth * 0.9;
+								height = window.innerHeight * 0.7;
+
+								// Recalculate height based on the new window dimensions
+								const headerHeight = document.querySelector('h1').offsetHeight;
+								const paragraphHeight = document.querySelector('p').offsetHeight;
+								const containerPadding = 32;
+								const verticalMargin = 24;
+								height = window.innerHeight - headerHeight - paragraphHeight - (containerPadding * 2) - verticalMargin;
+								if (height < 300) height = 300;
+
+								// Re-select SVG and update attributes
+								const svg = d3.select("#graph-container svg");
+								if (svg.empty()) return; // If SVG hasn't been rendered yet, do nothing
+
+								svg.attr("viewBox", `0 0 ${width} ${height}`);
+								// Re-center the force simulation based on new dimensions
+								// Note: Re-initializing the simulation fully might be needed for complex layouts on resize
+								// For simplicity, we're just updating the center force and restarting alpha
+								const simulation = d3.forceSimulation(d3.selectAll(".node").data())
+										.force("link", d3.forceLink(d3.selectAll(".link").data()).id(d => d.id).distance(1000))
+										.force("charge", d3.forceManyBody().strength(-200))
+										.force("center", d3.forceCenter(width / 2, height / 2));
+								simulation.alpha(0.3).restart(); // Restart simulation to adjust positions
+
+								// Re-attach tick handler if it was removed or if new simulation created
+								simulation.on("tick", () => {
+										d3.selectAll(".link")
+												.attr("x1", d => d.source.x)
+												.attr("y1", d => d.source.y)
+												.attr("x2", d => d.target.x)
+												.attr("y2", d => d.target.y);
+
+										d3.selectAll(".node")
+												.attr("transform", d => `translate(${d.x},${d.y})`);
+								});
+						});
+				});
+		</script>
+</body>
+</html>
+

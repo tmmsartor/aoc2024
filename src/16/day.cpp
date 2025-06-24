@@ -124,7 +124,7 @@ void Day::parse(ifstream& file) {
     i++;
   }
   // navigable grid
-  this->grid.init(move(lines));
+  this->grid.init(std::move(lines));
   // visited paths
   this->visited.init(grid.m,grid.n);
 
